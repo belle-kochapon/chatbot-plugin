@@ -130,7 +130,7 @@ setupToggleListener() {
       // Loading message
       const loadingMessageElement = this.renderMessage('...', 'bot');
 
-      // Call the mock API to get the bot's response.
+      //  Error handling
       try {
         const botResponse = await this.fetchBotResponse(userMessage);
         // Remove the loading message and display the actual bot response.
@@ -144,32 +144,36 @@ setupToggleListener() {
     }
   }
 
-  // An API call to a backend webhook
-  async fetchBotResponse(userMessage) {
+  // A function to call the WordPress backend, which acts as a proxy to the n8n API.
+async fetchBotResponse(userMessage) {
     try {
-      const res = await fetch("http://localhost:5678/webhook/4091fa09-fb9a-4039-9411-7104d213f601/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ message: userMessage })
-      });
-      
-      if (!res.ok) {
-        throw new Error("Failed to get response from server.");
-      }
-      
-      const data = await res.json();
-      return data.reply || " No reply received."; 
-      
+        const params = new URLSearchParams();
+        params.append('action', 'chatbot_request');
+        params.append('message', userMessage);
+        params.append('nonce', chatbot_data.nonce);
+
+        const res = await fetch(chatbot_data.ajax_url, {
+            method: 'POST',
+            body: params
+        });
+
+        if (!res.ok) {
+            throw new Error('Failed to get response from server.');
+        }
+
+        const data = await res.json();
+        
+        if (data.success) {
+            // The n8n response is expected to be in a nested property.
+            return data.data.reply || data.data.response || 'No reply received.';
+        } else {
+            throw new Error(data.data || 'An error occurred on the server.');
+        }
     } catch (err) {
-      console.error("Error fetching bot response:", err);
-      throw err; 
+        console.error('Error fetching bot response:', err);
+        throw err;
     }
-  }
-
-
-
+}
 }
 
 
